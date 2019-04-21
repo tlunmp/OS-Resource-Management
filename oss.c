@@ -1,8 +1,5 @@
 #include "resources.h"
 
-
-#define MESSAGEKEY 3000
-
 typedef struct message {
     long myType;
     char mtext[512];
@@ -12,18 +9,18 @@ typedef struct message {
 void signalCall(int signum);
 
 int shmid; 
-SharedMemory * shmPtr;
-int messageQueueId;
-Clock maxTimeBetweenNewProcs;
-Clock userReal;
+SharedMemory* shmPtr;
+Clock launchTime;
+
+static int messageQueueId;
 int times;
-int maxforks = 1;
 
-
+int randomresources();
 int randomInterval();
 void signalCall(int signum);
 void generateLaunch(int addInterval);
-
+void generateAvailableResource();
+void userProcess();
 
 int main(int argc, char* argv[]) {
 
@@ -57,7 +54,7 @@ int main(int argc, char* argv[]) {
 	if ((shmid = shmget(SHMKEY, sizeof(SharedMemory), IPC_CREAT | 0600)) < 0) {
         	perror("Error: shmget");
         	exit(errno);
-   	 }
+	}
   
  
 	if ((messageQueueId = msgget(MESSAGEKEY, IPC_CREAT | 0644)) == -1) {
@@ -72,24 +69,32 @@ int main(int argc, char* argv[]) {
 	pid_t childpid;
 
 	int fakePid = 0;
+	shmPtr->clockInfo.nanoSeconds = 0;
+	shmPtr->clockInfo.seconds = 0;
 
 	srand(NULL);
  	time_t t;
 	 srand((unsigned) time(&t));
 	
-	int i;
-	for(i=0; i < 3; i++) {	
-		int times = randomInterval();
-		printf("time is %d\n",times);
-
-		generateLaunch(times);
-
-		printf("launch time is %d:%d\n", shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);
-	}
+	generateLaunch(randomInterval());
 
 	
-/*
-	while(totalCount < maxChildProcess && totalCount < lines ){ 					
+
+	int processCount = 0;
+	int queueArray[20];
+	int totalCount = 0;
+	int maxChildProcess = 100;
+	
+	//generate the total resources
+	generateAvailableResource();
+
+
+	int processCount = 0;
+	int queueArray[20];
+	int totalCount = 0;
+	int maxChildProcess = 100;
+
+	while(totalCount < maxChildProcess){ 					
 
 			shmPtr->clockInfo.nanoSeconds += 20000;
 			//clock incrementation
@@ -98,23 +103,25 @@ int main(int argc, char* argv[]) {
 				shmPtr->clockInfo.nanoSeconds -= 1000000000;
 			}				
 		
-
 		
 			if(waitpid(0,NULL, WNOHANG)> 0)
 				ptr_count--;
 
-			if(shmPtr->clockInfo.seconds == maxTimeBetweenNewProcs.seconds && shmPtr->clockInfo.nanoSeconds > maxTimeBetweenNewProcs.nanoSeconds){	
-				char buffer1[100];
-				sprintf(buffer1, "%d", totalCount);
+			if(shmPtr->clockInfo.seconds == launchTime.seconds && shmPtr->clockInfo.nanoSeconds > launchTime.nanoSeconds){	
+				totalCount++;
+				
+
+				//char buffer1[100];
+			//	sprintf(buffer1, "%d", totalCount);
 				childpid=fork();
 
-							ptr_count++;
 				totalCount++;
 		
 				if(childpid < 0) {
 					perror("Fork failed");
 				} else if(childpid == 0) {		
-					execl("./user", "user", buffer1,(char*)0);
+					printf("%d,oss launced time is %d:%d\n",getpid(),shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);				
+					execl("./user", "user",NULL);
 					snprintf(errorMessage, sizeof(errorMessage), "%s: Error: ", argv[0]);
 	    	 			perror(errorMessage);		
 					exit(0);
@@ -124,7 +131,7 @@ int main(int argc, char* argv[]) {
 
 
 				message.myType = 1;	
-				strcpy(message.mText,"20");
+				strcpy(message.mtext,"20");
 	
 				if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
 					perror("msgsnd");
@@ -132,31 +139,42 @@ int main(int argc, char* argv[]) {
 				}
 
 	
-
+/*
 				if (msgrcv(messageQueueId, &message,sizeof(message)+1,2,0) == -1) {
 					perror("msgrcv");
 
 				}	
-
-				maxTimeBetweenNewProcs.nanoSeconds += 200000;
+*/	
+		
+				generateLaunch(randomInterval());
 		}
 	
 	}
 
-
-*/	
-	shmdt(shmPtr); //detaches a section of shared memory
-    	shmctl(shmid, IPC_RMID, NULL);  // deallocate the memory 
-
 	return 0;
 }
 
-void generateLaunch(int addInterval) {
-	shmPtr->clockInfo.nanoSeconds += addInterval;
+
+void userProcess() {
 	
-	if(shmPtr->clockInfo.nanoSeconds > 1000000000){
-		shmPtr->clockInfo.seconds++;
-		shmPtr->clockInfo.nanoSeconds -= 1000000000;
+
+
+
+}
+
+void generateAvailableResource(){
+	int i =0 ;
+	for(i=0; i <20; i++){
+		shmPtr->resources.available[i] = randomResources();
+	}
+}
+
+void generateLaunch(int addInterval) {
+	launchTime.nanoSeconds += addInterval;
+	
+	if(launchTime.nanoSeconds > 1000000000){
+		launchTime.seconds++;
+		launchTime.nanoSeconds -= 1000000000;
 	}				
 	
 } 
@@ -167,6 +185,14 @@ int  randomInterval() {
 	return times;
 }
 
+int randomResources() {
+	int resources = 0;
+	resources = rand() % (10 + 1 - 1) + 1;
+	return resources;
+
+
+
+}
 //signal calls
 void signalCall(int signum)
 {
