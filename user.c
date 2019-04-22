@@ -50,9 +50,9 @@ int main(int argc, char* argv[]) {
 	shmPtr = shmat(shmid, NULL, 0);
 
 	printf("%d, user launced time is %d:%d\n",getpid(),shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);				
+
 	while(1) {
 	
-
 		if (msgrcv(messageQueueId, &message,sizeof(message)+1,1,0) == -1) {
 			perror("msgrcv");
 		}
@@ -61,22 +61,37 @@ int main(int argc, char* argv[]) {
 
 		int chance = rand() % (100 + 1 - 1) + 1;
 
-		printf("\n Chance is %d\n",chance);
-		if(chance > 1 || chance < 33) {
+		printf("chance is %d\n",chance);
+		
 
+		//request
+		if(chance > 1 && chance < 26) {
+	
+			strcpy(message.mtext,"Request");
 
+		//release
+		} else if(chance > 25 && chance < 51) {
+			strcpy(message.mtext,"Release");
 
-		} 
-
-		if(chance >1 || chance < 33) {
-
-
-
-		} 
-
+		//block
+		} else if(chance >50 && chance < 76) {
+			strcpy(message.mtext,"Block");
+		
+		//terminated
+		} else {	
+			strcpy(message.mtext,"Terminated");
+		}
+		
+		message.myType = 2;	
+			
+		if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
+			perror("msgsnd");
+			exit(1);
+		}
+	
 
 	}	
-//			printf("entering critical section\n");
+
 
 
 	return 0;

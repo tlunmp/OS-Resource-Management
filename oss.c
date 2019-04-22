@@ -12,15 +12,24 @@ int shmid;
 SharedMemory* shmPtr;
 Clock launchTime;
 
+int shareable[4];
+int queueArray[20];
 static int messageQueueId;
 int times;
 
 int randomresources();
 int randomInterval();
+int randomizeShareablePosition();
+
+
+void generateShareablePosition();
 void signalCall(int signum);
 void generateLaunch(int addInterval);
-void generateAvailableResource();
+void generateMaxResource();
 void userProcess();
+void initializeQueueArray();
+void generateRequest(int fakePid);
+void checkIfDeadLockUponRequest(int fakePid);	
 
 int main(int argc, char* argv[]) {
 
@@ -30,7 +39,6 @@ int main(int argc, char* argv[]) {
 	Message message;
 
 
-	pid_t chilpid;
 	int ptr_count = 0;
 
 	
@@ -49,7 +57,7 @@ int main(int argc, char* argv[]) {
      	}
 	
 	//alarm for 2 real life second
-	alarm(timer);
+	alarm(2);
 	
 	if ((shmid = shmget(SHMKEY, sizeof(SharedMemory), IPC_CREAT | 0600)) < 0) {
         	perror("Error: shmget");
@@ -74,28 +82,22 @@ int main(int argc, char* argv[]) {
 
 	srand(NULL);
  	time_t t;
-	 srand((unsigned) time(&t));
-	
+	srand((unsigned) time(&t));
+	int processCount = 0;
+	int totalCount = 0;
+	int maxChildProcess = 3;
+	int status = 0;
+	int blockPos = 0;
+
+
 	generateLaunch(randomInterval());
 
-	
-
-	int processCount = 0;
-	int queueArray[20];
-	int totalCount = 0;
-	int maxChildProcess = 100;
-	
 	//generate the total resources
-	generateAvailableResource();
+	generateMaxResource();
 
-
-	int processCount = 0;
-	int queueArray[20];
-	int totalCount = 0;
-	int maxChildProcess = 100;
+	initializeQueueArray();
 
 	while(totalCount < maxChildProcess){ 					
-
 			shmPtr->clockInfo.nanoSeconds += 20000;
 			//clock incrementation
 			if(shmPtr->clockInfo.nanoSeconds > 1000000000){
@@ -108,50 +110,109 @@ int main(int argc, char* argv[]) {
 				ptr_count--;
 
 			if(shmPtr->clockInfo.seconds == launchTime.seconds && shmPtr->clockInfo.nanoSeconds > launchTime.nanoSeconds){	
+									
 				totalCount++;
-				
+				printf("totalCount is %d\n",totalCount)	;			
 
-				//char buffer1[100];
-			//	sprintf(buffer1, "%d", totalCount);
-				childpid=fork();
-
-				totalCount++;
-		
-				if(childpid < 0) {
-					perror("Fork failed");
-				} else if(childpid == 0) {		
-					printf("%d,oss launced time is %d:%d\n",getpid(),shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);				
-					execl("./user", "user",NULL);
-					snprintf(errorMessage, sizeof(errorMessage), "%s: Error: ", argv[0]);
-	    	 			perror(errorMessage);		
-					exit(0);
-				} else {
-					
-				}
-
-
-				message.myType = 1;	
-				strcpy(message.mtext,"20");
-	
+				message.myType = 1;
+				char buffer1[100];
+				sprintf(buffer1, "%d", fakePid);
+				strcpy(message.mtext,buffer1);	
+			
 				if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
 					perror("msgsnd");
 					exit(1);
 				}
 
-	
-/*
+
+				// char buffer1[100];
+				// sprintf(buffer1, "%d", totalCount);
+				childpid=fork();
+
+		
+				if(childpid < 0) {
+					perror("Fork failed");
+				} else if(childpid == 0) {		
+					execl("./user", "user",NULL);
+					snprintf(errorMessage, sizeof(errorMessage), "%s: Error: ", argv[0]);
+	    	 			perror(errorMessage);		
+					exit(0);
+				} else {
+		
+				}
+		
 				if (msgrcv(messageQueueId, &message,sizeof(message)+1,2,0) == -1) {
 					perror("msgrcv");
 
 				}	
-*/	
-		
+	
+				printf("oss recieve %s\n", message.mtext);	
+
+				if(strcmp(message.mtext, "Block") == 0 ){
+					queueArray[blockPos] = fakePid;
+					blockPos++;
+				}	
+
+				if(strcmp(message.mtext, "Request") == 0 ){
+					generateRequest(fakePid);
+					
+					checkIfDeadLockUponRequest(fakePid);
+					int i;
+					for(i = 0; i < 20; i++) {	
+						printf("%d request is %d: %d\n",fakePid,i,shmPtr->resourceDescriptor[fakePid].request[i]);
+					}
+				}	
+
+				
+				if(strcmp(message.mtext, "Terminated") == 0 ){
+				
+				}
+
+				fakePid++;	
 				generateLaunch(randomInterval());
-		}
+			}
 	
 	}
 
+	//msgctl(messageQueueId, IPC_RMID, NULL); 
+	//shmdt(shmPtr); //detaches a section of shared memory
+    	//shmctl(shmid, IPC_RMID, NULL);  // deallocate the memory 
 	return 0;
+}
+
+void generateShareablePosition(){
+	int i;
+	for(i=0; i < 4; i++){
+		shareable[i] = randomizeShareablePosition();
+	}
+}
+
+
+void checkIfDeadLockUponRequest(int fakePid){	
+	
+	//check shmPtr->resources max[i] and shmPtr->resourceDescriptor[fakePid].request[i]	
+	int i;
+	for(i = 0; i < 20; i++){
+
+		printf("%d = %d\n", shmPtr->resources.max[i], shmPtr->resourceDescriptor[fakePid].request[i]);
+	}
+
+}
+
+void generateRequest(int fakePid) {
+	int i = 0;
+	int times;
+
+	for(i = 0; i < 20; i++) {	
+		shmPtr->resourceDescriptor[fakePid].request[i] = rand() % (3 + 1 - 1) + 1;
+	}
+}
+
+void initializeQueueArray(){
+	int i = 0;
+	for(i = 0; i <20; i++){
+		queueArray[i] = -1;
+	}	
 }
 
 
@@ -162,10 +223,10 @@ void userProcess() {
 
 }
 
-void generateAvailableResource(){
+void generateMaxResource(){
 	int i =0 ;
 	for(i=0; i <20; i++){
-		shmPtr->resources.available[i] = randomResources();
+		shmPtr->resources.max[i] = randomResources();
 	}
 }
 
@@ -189,10 +250,16 @@ int randomResources() {
 	int resources = 0;
 	resources = rand() % (10 + 1 - 1) + 1;
 	return resources;
-
-
-
 }
+
+
+int randomizeShareablePosition() {
+	int shareable = 0;
+	shareable = rand() % (19 + 0 - 0) + 0;
+	return shareable;
+}
+
+
 //signal calls
 void signalCall(int signum)
 {
