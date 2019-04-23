@@ -270,6 +270,18 @@ void displayTable(){
 
 
 }
+
+
+void ifTerminated(){
+	
+
+
+
+
+}
+
+
+
 //when requesting
 int ifBlockResources(int fakePid, int result) {
 	if(shmPtr->resources.available[result] >= shmPtr->resourceDescriptor[fakePid].request[result] ){

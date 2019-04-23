@@ -49,7 +49,6 @@ int main(int argc, char* argv[]) {
  	 
 	shmPtr = shmat(shmid, NULL, 0);
 
-	printf("%d, user launced time is %d:%d\n",getpid(),shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);				
 
 	while(1) {
 	
@@ -57,33 +56,29 @@ int main(int argc, char* argv[]) {
 			perror("msgrcv");
 		}
 		
-		printf("message recieve is %s\n", message.mtext);
+//		printf("message recieve is %s\n", message.mtext);
 
-		int chance = rand() % (100 + 1 - 1) + 1;
+		int chance = rand() % (60 + 1 - 1) + 1;
 
-		printf("chance is %d\n",chance);
 		
 
 		//request
-		if(chance > 1 && chance < 26) {
+		if(chance > 1 && chance < 21) {
 	
 			strcpy(message.mtext,"Request");
 
 		//release
-		} else if(chance > 25 && chance < 51) {
+		} else if(chance > 20 && chance < 41) {
 			strcpy(message.mtext,"Release");
 
-		//block
-		} else if(chance >50 && chance < 76) {
-			strcpy(message.mtext,"Block");
-		
 		//terminated
-		} else {	
+		} else if(chance >40 && chance < 61) {	
 			strcpy(message.mtext,"Terminated");
 		}
 		
 		message.myType = 2;	
 			
+		strcpy(message.mtext,"Request");
 		if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
 			perror("msgsnd");
 			exit(1);
