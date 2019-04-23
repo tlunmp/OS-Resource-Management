@@ -29,6 +29,7 @@ void userProcess();
 void initializeQueueArray();
 void displayTable();
 int ifBlockResources(int fakePid, int result);
+void release(int fakePid);
 
 void addRequestToAllocated(int fakePid, int results);
 void generateInterval(int addInterval);
@@ -86,7 +87,7 @@ int main(int argc, char* argv[]) {
 	srand((unsigned) time(&t));
 	int processCount = 0;
 	int totalCount = 0;
-	int maxChildProcess = 2;
+	int maxChildProcess = 1;
 	int status = 0;
 	int blockPos = 0;
 
@@ -175,13 +176,12 @@ int main(int argc, char* argv[]) {
 
 					if(strcmp(message.mtext, "Request") == 0 ){
 	
-						
-
 						int results = generateRequest(fakePid);
 						printf("Master has detected Process P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
 						int resultBlocked = ifBlockResources(fakePid,results);
 
 						if(resultBlocked == 0){
+							printf("Master blocking P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
 							queueArray[blockPos] = fakePid;	
 							blockPos++;					
 						} else {
@@ -197,6 +197,15 @@ int main(int argc, char* argv[]) {
 
 					if(strcmp(message.mtext, "Terminated") == 0 ){
 				
+						//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+					}
+
+					if(strcmp(message.mtext, "Release") == 0 ){
+						printf("releasing\n");		
+		
+						release(fakePid);
+						displayTable();
+						//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
 					}
 
 				
@@ -212,7 +221,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-	//msgctl(messageQueueId, IPC_RMID, NULL); 
+//	msgctl(messageQueueId, IPC_RMID, NULL); 
 	//shmdt(shmPtr); //detaches a section of shared memory
     	//shmctl(shmid, IPC_RMID, NULL);  // deallocate the memory 
 	
@@ -272,12 +281,41 @@ void displayTable(){
 }
 
 
-void ifTerminated(){
+void release(int fakePid){
+	int i = 0, j = 0;
+	int validationArray[20];
+	int returnResult = 0;
+
+	for(i=0; i < 20; i++) {
+		validationArray[i] = 0;	
+	}
+
+//	shmPtr->resourceDescriptor[fakePid].allocated[5] = 5;
+	shmPtr->resourceDescriptor[fakePid].allocated[6] = 5;
 	
+	printf("Master releasing P%d, Resources are: ",fakePid);
+	
+	for(i=0; i < 20; i++) {
+		if(shmPtr->resourceDescriptor[fakePid].allocated[i] > 0){		
+			validationArray[j] = i;	
+			printf("R%d:%d ",i, shmPtr->resourceDescriptor[fakePid].allocated[i]);	
+			j++;
+		} else if(shmPtr->resourceDescriptor[fakePid].allocated[i] == 0){
+			returnResult++;
+		}
+	}
 
 
-
-
+	if(returnResult == 20){
+		printf("None\n",fakePid);
+	} else {
+		printf("\n");
+		int i;
+		//add to available
+		for(i=0; i < 20; i++) {
+			shmPtr->resources.available[i] += shmPtr->resourceDescriptor[fakePid].allocated[i];
+		}
+	}
 }
 
 
@@ -285,7 +323,7 @@ void ifTerminated(){
 //when requesting
 int ifBlockResources(int fakePid, int result) {
 	if(shmPtr->resources.available[result] >= shmPtr->resourceDescriptor[fakePid].request[result] ){
-		printf("%d:%d\n", shmPtr->resources.available[result], shmPtr->resourceDescriptor[fakePid].request[result]);
+	//	printf("%d:%d\n", shmPtr->resources.available[result], shmPtr->resourceDescriptor[fakePid].request[result]);
 		return 1;
 	} else {
 		return 0;
@@ -316,10 +354,7 @@ void generateAllocation(){
 			//printf("P%d: %d, allocated rss %d\n", fakePid, i, shmPtr->resourceDescriptor[fakePid].allocated[i]);
 		}
 
-
 	}
-
-
 }
 
 void initializeQueueArray(){
@@ -334,7 +369,7 @@ int  generateRequest(int fakePid) {
 	int i = 0;
 	int resourcesLoc = rand() % (19 + 0 - 0) + 0;
 	shmPtr->resourceDescriptor[fakePid].request[resourcesLoc] = rand() % (10 + 1 - 1) + 1;
-	printf("P%d: request rss at R%d,  %d\n", fakePid, resourcesLoc,  shmPtr->resourceDescriptor[fakePid].request[resourcesLoc]);
+//	printf("P%d: request rss at R%d,  %d\n", fakePid, resourcesLoc,  shmPtr->resourceDescriptor[fakePid].request[resourcesLoc]);
 	return resourcesLoc;
 }
 
@@ -343,7 +378,7 @@ void generateShareablePosition(){
 	int i;
 	for(i=0; i < 4; i++){
 		shareable[i] = randomizeShareablePosition();
-		printf("shareable is %d\n",shareable[i]);
+		//printf("shareable is %d\n",shareable[i]);
 
 	}
 }
