@@ -8,31 +8,32 @@ typedef struct message {
 
 void signalCall(int signum);
 
+int isNext = 0;
 int shmid; 
 SharedMemory* shmPtr;
 Clock launchTime;
 
 int shareable[4];
 int queueArray[20];
+int resultArray[20];
 static int messageQueueId;
 int times;
 int availableActive = 0;
-int deadLock[20];
-
 int randomresources();
 int randomInterval();
 int randomizeShareablePosition();
 
-void signalCall(int signum);
 
+void signalCall(int signum);
 void userProcess();
 void initializeQueueArray();
 void displayTable();
 int ifBlockResources(int fakePid, int result);
 void release(int fakePid);
-
+void checkDeadLockDetection();
 void addRequestToAllocated(int fakePid, int results);
 void generateInterval(int addInterval);
+
 
 void generateAvailable();
 void generateMaxResource();
@@ -87,7 +88,7 @@ int main(int argc, char* argv[]) {
 	srand((unsigned) time(&t));
 	int processCount = 0;
 	int totalCount = 0;
-	int maxChildProcess = 1;
+	int maxChildProcess = 30;
 	int status = 0;
 	int blockPos = 0;
 
@@ -114,7 +115,8 @@ int main(int argc, char* argv[]) {
 	//alarm for 2 real life second
 	alarm(2);
 
-	
+
+
 	while(totalCount < maxChildProcess){ 					
 			shmPtr->clockInfo.nanoSeconds += 20000;
 			//clock incrementation
@@ -135,87 +137,97 @@ int main(int argc, char* argv[]) {
 					for(m=0; m < 20; m++){
 						printf("blocked is %d\n",queueArray[m]);
 					}
-*/
+*/	
+
 							
-					totalCount++;
-
+						totalCount++;
 		
-					message.myType = 1;
-					char buffer1[100];
-					sprintf(buffer1, "%d", fakePid);
-					strcpy(message.mtext,buffer1);	
+						message.myType = 1;
+						char buffer1[100];
+						sprintf(buffer1, "%d", fakePid);
+						strcpy(message.mtext,buffer1);	
 			
-					if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
-						perror("msgsnd");
-						exit(1);
-					}
-
-	
-					// char buffer1[100];
-					// sprintf(buffer1, "%d", totalCount);
-					childpid=fork();
-
-		
-					if(childpid < 0) {
-						perror("Fork failed");
-					} else if(childpid == 0) {		
-						execl("./user", "user",NULL);
-						snprintf(errorMessage, sizeof(errorMessage), "%s: Error: ", argv[0]);
-	    	 				perror(errorMessage);		
-						exit(0);
-					} else {
-			
-					}
-			
-					if (msgrcv(messageQueueId, &message,sizeof(message)+1,2,0) == -1) {
-						perror("msgrcv");
-
-					}	
-	
-					printf("oss recieve %s\n", message.mtext);	
-
-					if(strcmp(message.mtext, "Request") == 0 ){
-	
-						int results = generateRequest(fakePid);
-						printf("Master has detected Process P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
-						int resultBlocked = ifBlockResources(fakePid,results);
-
-						if(resultBlocked == 0){
-							printf("Master blocking P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
-							queueArray[blockPos] = fakePid;	
-							blockPos++;					
-						} else {
-											
-							generateInterval(randomIntervalLaunch);
-							addRequestToAllocated(fakePid, results);
-							printf("Master granting P%d  request R%d at time %d:%d\n",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
-							displayTable();
+						if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
+							perror("msgsnd");
+							exit(1);
 						}
-						
+
+	
+						// char buffer1[100];
+						// sprintf(buffer1, "%d", totalCount);
+						childpid=fork();
+
 		
-					}	
+						if(childpid < 0) {
+							perror("Fork failed");
+						} else if(childpid == 0) {		
+							execl("./user", "user",NULL);
+							snprintf(errorMessage, sizeof(errorMessage), "%s: Error: ", argv[0]);
+	    	 					perror(errorMessage);		
+							exit(0);
+						} else {
+			
+						}
+			
+						if (msgrcv(messageQueueId, &message,sizeof(message)+1,2,0) == -1) {
+							perror("msgrcv");
 
-					if(strcmp(message.mtext, "Terminated") == 0 ){
-				
-						//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
-					}
+						}	
+	
+		//				printf("oss recieve %s\n", message.mtext);	
 
-					if(strcmp(message.mtext, "Release") == 0 ){
-						printf("releasing\n");		
+						if(strcmp(message.mtext, "Request") == 0 ){
+	
+							int results = generateRequest(fakePid);
+							printf("Master has detected Process P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
+							int resultBlocked = ifBlockResources(fakePid,results);
+
+							if(resultBlocked == 0){
+								printf("Master blocking P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
+								
+								queueArray[blockPos] = fakePid;
+								resultArray[blockPos] = results;
+								/*
+								shmPtr->deadLock[blockPos].fakePid = fakePid;
+								
+								int i;
+								for(i=0; i <20;i++){
+									shmPtr->deadLock[blockPos].deadLockResources[i] = shmPtr->resourceDescriptor[fakePid].allocated[i];
+								}*/
+								blockPos++;					
+							} else {
+								generateInterval(randomIntervalLaunch);
+								addRequestToAllocated(fakePid, results);
+								printf("Master granting P%d  request R%d at time %d:%d\n",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+								displayTable();
+							}
+						}	
+
+						if(strcmp(message.mtext, "Terminated") == 0 ){
+							printf("terminated P%d\n",fakePid);	
+							//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+						}
+
+						if(strcmp(message.mtext, "Release") == 0 ){
 		
-						release(fakePid);
-						displayTable();
-						//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
-					}
+							release(fakePid);
+							displayTable();
+							//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+						}
 
-				
-					if(fakePid < 19){
-						fakePid++;	
-					} else {
-						fakePid = 0;
-					}
-
-				
+					
+						if(fakePid < 17){			
+							fakePid++;	
+						} else {
+							checkDeadLockDetection();
+							isNext == 0;
+							fakePid = 0;		
+							initializeQueueArray();
+							blockPos = 0;
+						}
+		
+			
+					
 
 					generateLaunch(randomInterval());	
 			}
@@ -225,7 +237,7 @@ int main(int argc, char* argv[]) {
 	//shmdt(shmPtr); //detaches a section of shared memory
     	//shmctl(shmid, IPC_RMID, NULL);  // deallocate the memory 
 	
- 	  kill(0, SIGTERM);
+ //	kill(0, SIGTERM);
 	return 0;
 }
 
@@ -280,7 +292,6 @@ void displayTable(){
 
 }
 
-
 void release(int fakePid){
 	int i = 0, j = 0;
 	int validationArray[20];
@@ -291,7 +302,7 @@ void release(int fakePid){
 	}
 
 //	shmPtr->resourceDescriptor[fakePid].allocated[5] = 5;
-	shmPtr->resourceDescriptor[fakePid].allocated[6] = 5;
+//	shmPtr->resourceDescriptor[fakePid].allocated[6] = 5;
 	
 	printf("Master releasing P%d, Resources are: ",fakePid);
 	
@@ -318,6 +329,61 @@ void release(int fakePid){
 	}
 }
 
+void checkDeadLockDetection() {
+	printf("Current system resources\n");
+	printf("Master running deadlock detection at time %d:%d\n",shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);
+	int i = 0;
+	int manyBlock = 0;	
+	int deadLockArray[20];
+
+	for(i =0; i < 20; i++){
+		if(queueArray[i] != -1){
+			manyBlock++;
+		}
+	}
+
+	int bufSize = 100;
+	char buffer[bufSize];
+	
+
+	printf("	Process ");
+
+	for(i =0; i < manyBlock; i++){
+		printf( "P%d, ", queueArray[i]);
+
+	}	
+	int j = 0;
+	printf("deadlocked\n");
+	printf("	Attempting to resolve deadlock...\n");
+/*
+	for(i =0; i < manyBlock; i++){
+		printf( "%d\n", resultArray[i]);
+	}	
+
+*/		
+	for(i =0; i < manyBlock; i++){	
+		if(shmPtr->resources.available[resultArray[i]] <= shmPtr->resourceDescriptor[queueArray[i]].request[resultArray[i]] ){
+			printf("	Killing process P%d\n", queueArray[i]);
+			printf("		");
+			release(queueArray[i]);	
+			printf("	Master running deadlock detection after P%d killed\n",queueArray[i]);
+			printf("	Processes ");
+			int m;
+			for(m=i+1; m <manyBlock; m++){
+				printf("P%d, ",queueArray[m]);	
+			}
+			
+			printf("deadlocked\n");
+		} else {
+			addRequestToAllocated(queueArray[i], resultArray[i]);
+			printf("	Master granting P%d request R%d at time %d:%d\n",queueArray[i], resultArray[i], shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+			displayTable();
+	
+			//printf("%d:%d\n",shmPtr->resources.available[resultArray[i]],shmPtr->resourceDescriptor[queueArray[i]].request[resultArray[i]]);
+		}
+	}	
+	printf("System is no longer in deadlock\n");
+}
 
 
 //when requesting
@@ -362,6 +428,15 @@ void initializeQueueArray(){
 	for(i = 0; i <20; i++){
 		queueArray[i] = -1;
 	}	
+	
+
+/*
+	for(j=0; j < 18; j++){
+		shmPtr->deadLock[j].fakePid = -1;
+		for(i = 0; i <20; i++){
+			shmPtr->deadLock[j].deadLockRequest[i] = -1;
+		}	
+	}*/
 }
 
 

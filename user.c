@@ -58,27 +58,27 @@ int main(int argc, char* argv[]) {
 		
 //		printf("message recieve is %s\n", message.mtext);
 
-		int chance = rand() % (60 + 1 - 1) + 1;
+		int chance = rand() % (100 + 1 - 1) + 1;
 
 		
 
 		//request
-		if(chance > 1 && chance < 21) {
+		if(chance > 1 && chance < 53) {
 	
 			strcpy(message.mtext,"Request");
 
 		//release
-		} else if(chance > 20 && chance < 41) {
+		} else if(chance > 54 && chance < 81) {
 			strcpy(message.mtext,"Release");
 
 		//terminated
-		} else if(chance >40 && chance < 61) {	
+		} else if(chance >80 && chance < 101) {	
 			strcpy(message.mtext,"Terminated");
 		}
 		
 		message.myType = 2;	
 			
-		strcpy(message.mtext,"Request");
+	//	strcpy(message.mtext,"Release");
 		if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
 			perror("msgsnd");
 			exit(1);
