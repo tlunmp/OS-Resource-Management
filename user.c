@@ -20,7 +20,6 @@ int chance[100];
 int chancePos =0;
 SharedMemory* shmPtr;
 
-
 typedef struct message {
     long myType;
     char mtext[512];
@@ -49,13 +48,6 @@ int main(int argc, char* argv[]) {
 		//srand(NULL);
  		//time_t t;
 	srand(getpid());
-		
-/*	
-	int i=0;
-	for(i=0; i <100; i++){
-		chance[i] = rand() % (100 + 1 - 1) + 1;
-		printf("chanes are %d\n",chance[i]);
-	}*/
 
 	while(1) {
 	
@@ -66,18 +58,18 @@ int main(int argc, char* argv[]) {
 		int chance = rand() % (100 + 1 - 1) + 1;
 		
 //		printf("message recieve is %s\n", message.mtext); 
-		printf("\n chance are %d\n",chance);	
+//		printf("\n chance are %d\n",chance);	
 		
 		//request
-		if(chance > 1 && chance < 53) {
+		if(chance > 0 && chance < 63) {
 			strcpy(message.mtext,"Request");
 
 		//release
-		} else if(chance > 52 && chance < 73) {
+		} else if(chance > 62 && chance < 93) {
 			strcpy(message.mtext,"Release");
 
 		//terminated
-		} else if(chance > 72 && chance  < 101) {	
+		} else if(chance > 92 && chance  < 101) {	
 			strcpy(message.mtext,"Terminated");
 			terminate = 1;
 		}
@@ -90,7 +82,7 @@ int main(int argc, char* argv[]) {
 			exit(1);
 		} 
 
-			exit(0);
+		exit(0);
 	
   	 	//kill(0, SIGTERM);
 
