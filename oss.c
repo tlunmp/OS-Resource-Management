@@ -22,7 +22,9 @@ int availableActive = 0;
 int randomresources();
 int randomInterval();
 int randomizeShareablePosition();
-
+int nonTerminated[20];
+int num = 0;
+int terminatedNumber = 0;
 
 void signalCall(int signum);
 void userProcess();
@@ -33,7 +35,7 @@ void release(int fakePid);
 void checkDeadLockDetection();
 void addRequestToAllocated(int fakePid, int results);
 void generateInterval(int addInterval);
-
+void nonTerminate();
 
 void generateAvailable();
 void generateMaxResource();
@@ -88,10 +90,9 @@ int main(int argc, char* argv[]) {
 	srand((unsigned) time(&t));
 	int processCount = 0;
 	int totalCount = 0;
-	int maxChildProcess = 30;
+	int maxChildProcess = 100;
 	int status = 0;
 	int blockPos = 0;
-
 
 	generateLaunch(randomInterval());
 
@@ -113,11 +114,16 @@ int main(int argc, char* argv[]) {
 	initializeQueueArray();
 
 	//alarm for 2 real life second
-	alarm(2);
+	//alarm(10);
 
-
-
-	while(totalCount < maxChildProcess){ 					
+	nonTerminate();
+/*
+	int z;
+	for(z=1; z < 18; z++){
+		nonTerminated[z] = -1;
+	}
+*/	
+	while(totalCount < maxChildProcess || ptr_count > 0){ 					
 			shmPtr->clockInfo.nanoSeconds += 20000;
 			//clock incrementation
 			if(shmPtr->clockInfo.nanoSeconds > 1000000000){
@@ -126,10 +132,12 @@ int main(int argc, char* argv[]) {
 			}				
 		
 		
-			if(waitpid(0,NULL, WNOHANG)> 0)
+			if(waitpid(childpid,NULL, WNOHANG)> 0){
 				ptr_count--;
+			}
 
-			if(shmPtr->clockInfo.seconds == launchTime.seconds && shmPtr->clockInfo.nanoSeconds > launchTime.nanoSeconds){	
+
+			if(ptr_count < 18 && shmPtr->clockInfo.seconds == launchTime.seconds && shmPtr->clockInfo.nanoSeconds > launchTime.nanoSeconds){	
 					
 
 /*
@@ -137,11 +145,42 @@ int main(int argc, char* argv[]) {
 					for(m=0; m < 20; m++){
 						printf("blocked is %d\n",queueArray[m]);
 					}
-*/	
-
+*/
+						int l;	
+						
+						for(l=0; l<18;l++){
+							if(nonTerminated[l] == -1){
+								terminatedNumber++;					
+							} 
+						}
 							
-						totalCount++;
-		
+						if(terminatedNumber == 18){
+							printf("All Process are Terminated.\n");
+  	 						kill(0, SIGTERM);
+						} else {
+							terminatedNumber = 0;
+						}
+
+						if(nonTerminated[num] != -1){
+							fakePid = nonTerminated[num];
+						} else {	
+							
+							int s = num;
+							for(s=num; s<18;s++){
+								if(nonTerminated[s] == -1){
+									num++;
+								} else {
+									break;
+								}
+
+							}
+							
+							fakePid = nonTerminated[num];
+
+							//printf("fakeid is %d",fakePid);
+						
+						}
+	
 						message.myType = 1;
 						char buffer1[100];
 						sprintf(buffer1, "%d", fakePid);
@@ -157,6 +196,8 @@ int main(int argc, char* argv[]) {
 						// sprintf(buffer1, "%d", totalCount);
 						childpid=fork();
 
+						totalCount++;
+						ptr_count++;
 		
 						if(childpid < 0) {
 							perror("Fork failed");
@@ -185,8 +226,19 @@ int main(int argc, char* argv[]) {
 							if(resultBlocked == 0){
 								printf("Master blocking P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
 								
-								queueArray[blockPos] = fakePid;
-								resultArray[blockPos] = results;
+								int f, duplicate = 0;
+								for(f=0; f< 18; f++){
+									if(queueArray[f] == fakePid){
+										duplicate++;
+									}
+								}
+								
+								if(duplicate == 0){
+									queueArray[blockPos] = fakePid;
+									resultArray[blockPos] = results;
+								} else {
+									duplicate = 0;
+								}
 								/*
 								shmPtr->deadLock[blockPos].fakePid = fakePid;
 								
@@ -196,7 +248,7 @@ int main(int argc, char* argv[]) {
 								}*/
 								blockPos++;					
 							} else {
-								generateInterval(randomIntervalLaunch);
+								//generateInterval(randomIntervalLaunch);
 								addRequestToAllocated(fakePid, results);
 								printf("Master granting P%d  request R%d at time %d:%d\n",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
 								displayTable();
@@ -204,32 +256,46 @@ int main(int argc, char* argv[]) {
 						}	
 
 						if(strcmp(message.mtext, "Terminated") == 0 ){
-							printf("terminated P%d\n",fakePid);	
-							//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+							printf("Master terminating P%d at %d:%d\n",fakePid, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
+							nonTerminated[fakePid] = -1;
+
+						//	printf("terminated fakePid %d,%d",fakePid, nonTerminated[fakePid]);
+							release(fakePid);
 						}
 
 						if(strcmp(message.mtext, "Release") == 0 ){
 		
 							release(fakePid);
-							displayTable();
+							//displayTable();
 							//printf("Master terminating  P%d  Releasing  R%d ",fakePid, results, shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
 						}
 
 					
-						if(fakePid < 17){			
-							fakePid++;	
+						if(num < 17){			
+							num++;	
 						} else {
-							checkDeadLockDetection();
+						
+							int k,w=0;
+							for(k =0; k < 20; k++){
+								if(queueArray[k] != -1){
+									w++;
+								}
+							}
+
+							if(w > 0){
+								checkDeadLockDetection();
+							}
+
 							isNext == 0;
-							fakePid = 0;		
+							num = 0;		
 							initializeQueueArray();
 							blockPos = 0;
 						}
 		
 			
-					
+						generateLaunch(randomInterval());	
+							
 
-					generateLaunch(randomInterval());	
 			}
 		}
 
@@ -237,11 +303,17 @@ int main(int argc, char* argv[]) {
 	//shmdt(shmPtr); //detaches a section of shared memory
     	//shmctl(shmid, IPC_RMID, NULL);  // deallocate the memory 
 	
- //	kill(0, SIGTERM);
 	return 0;
 }
 
+void nonTerminate(){
+	int i;
+	for(i = 0; i < 18; i++){
+		nonTerminated[i] = i;
+	}
 
+
+}
 
 
 void displayTable(){
@@ -324,12 +396,20 @@ void release(int fakePid){
 		int i;
 		//add to available
 		for(i=0; i < 20; i++) {
-			shmPtr->resources.available[i] += shmPtr->resourceDescriptor[fakePid].allocated[i];
+			
+			if(i == shareable[0] || i == shareable[1] || i == shareable[2] || i == shareable[3]){
+				shmPtr->resourceDescriptor[fakePid].allocated[i] = 0;
+			} else {
+				shmPtr->resources.available[i] += shmPtr->resourceDescriptor[fakePid].allocated[i];
+				shmPtr->resourceDescriptor[fakePid].allocated[i] = 0;
+			}
+		
 		}
 	}
 }
 
 void checkDeadLockDetection() {
+
 	printf("Current system resources\n");
 	printf("Master running deadlock detection at time %d:%d\n",shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);
 	int i = 0;
@@ -377,7 +457,7 @@ void checkDeadLockDetection() {
 		} else {
 			addRequestToAllocated(queueArray[i], resultArray[i]);
 			printf("	Master granting P%d request R%d at time %d:%d\n",queueArray[i], resultArray[i], shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
-			displayTable();
+			//displayTable();
 	
 			//printf("%d:%d\n",shmPtr->resources.available[resultArray[i]],shmPtr->resourceDescriptor[queueArray[i]].request[resultArray[i]]);
 		}
@@ -490,18 +570,19 @@ void generateLaunch(int addInterval) {
 		launchTime.nanoSeconds -= 1000000000;
 	}				
 	
+		
 } 
 
 int  randomIntervalLaunch() {
 	int times = 0; 
-	times = rand() % (250000000 + 1 - 1) + 1;
+	times = rand() % (2500000 + 1 - 1) + 1;
 	return times;
 }
 
 
 int  randomInterval() {
 	int times = 0; 
-	times = rand() % (500000000 + 1 - 1) + 1;
+	times = rand() % (5000000 + 1 - 1) + 1;
 	return times;
 }
 
@@ -543,5 +624,3 @@ void signalCall(int signum)
    
       exit(EXIT_SUCCESS);
  }
-
-

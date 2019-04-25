@@ -12,10 +12,12 @@
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <fcntl.h>
+#include <time.h>
 
 int shmid; 
 int child_id;
-
+int chance[100];
+int chancePos =0;
 SharedMemory* shmPtr;
 
 
@@ -25,7 +27,7 @@ typedef struct message {
 } Message;
 
 static int messageQueueId;
-
+int terminate = 0;
 
 int main(int argc, char* argv[]) {
 
@@ -41,53 +43,57 @@ int main(int argc, char* argv[]) {
             exit(errno);
       	}
 
-	srand(NULL);
- 	time_t t;
-	 srand((unsigned) time(&t));
-	
 
  	 
 	shmPtr = shmat(shmid, NULL, 0);
-
+		//srand(NULL);
+ 		//time_t t;
+	srand(getpid());
+		
+/*	
+	int i=0;
+	for(i=0; i <100; i++){
+		chance[i] = rand() % (100 + 1 - 1) + 1;
+		printf("chanes are %d\n",chance[i]);
+	}*/
 
 	while(1) {
 	
 		if (msgrcv(messageQueueId, &message,sizeof(message)+1,1,0) == -1) {
 			perror("msgrcv");
 		}
-		
-//		printf("message recieve is %s\n", message.mtext);
 
 		int chance = rand() % (100 + 1 - 1) + 1;
-
 		
-
+//		printf("message recieve is %s\n", message.mtext); 
+		printf("\n chance are %d\n",chance);	
+		
 		//request
 		if(chance > 1 && chance < 53) {
-	
 			strcpy(message.mtext,"Request");
 
 		//release
-		} else if(chance > 54 && chance < 81) {
+		} else if(chance > 52 && chance < 73) {
 			strcpy(message.mtext,"Release");
 
 		//terminated
-		} else if(chance >80 && chance < 101) {	
+		} else if(chance > 72 && chance  < 101) {	
 			strcpy(message.mtext,"Terminated");
+			terminate = 1;
 		}
-		
+	
 		message.myType = 2;	
 			
 	//	strcpy(message.mtext,"Release");
 		if(msgsnd(messageQueueId, &message,sizeof(message)+1,0) == -1) {
 			perror("msgsnd");
 			exit(1);
-		}
+		} 
+
+			exit(0);
 	
+  	 	//kill(0, SIGTERM);
 
 	}	
-
-
-
 	return 0;
 }
