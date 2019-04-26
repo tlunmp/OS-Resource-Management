@@ -26,6 +26,7 @@ int num = 0;
 int terminatedNumber = 0;
 FILE *fp; 
 char verbose[] = "on";
+int averageDeadlock = 0;
 
 //tracker
 int numTerminatedDeadLock = 0;
@@ -154,7 +155,8 @@ int main(int argc, char* argv[]) {
 	nonTerminate();
 	
 
-	//alarm(timer);
+	//alarm
+	alarm(timer);
 	while(totalCount < maxChildProcess || ptr_count > 0){ 					
 			
 			shmPtr->clockInfo.nanoSeconds += 20000;
@@ -186,18 +188,21 @@ int main(int argc, char* argv[]) {
 								terminatedNumber++;					
 							} 
 						}
-							
+						
+						//if all terminate it just terminate the program or reset it	
 						if(terminatedNumber == 18){					
 							fprintf(fp,"All Process are Terminated.\n");
   	 						fprintf(fp,"Total Request Granted: %d\n", trackRequest);	
   	 						fprintf(fp,"Total Normal Process Terminated: %d\n", trackProcessTerminated );
   	 						fprintf(fp,"Total Killed Process from DeadLock: %d\n", numTerminatedDeadLock);
+							fprintf(fp,"Average is %d deadlock\n", averageDeadlock / timesDeadlockRun);
   	 						fprintf(fp,"Total DeadLock Run: %d\n", timesDeadlockRun);
-					
+							
 							fprintf(stderr,"All Process are Terminated.\n");
   	 						fprintf(stderr,"Total Request Granted: %d\n", trackRequest);	
   	 						fprintf(stderr,"Total Normal Process Terminated: %d\n", trackProcessTerminated );
   	 						fprintf(stderr,"Total Killed Process from DeadLock: %d\n", numTerminatedDeadLock);
+							fprintf(stderr,"Average is %d deadlock\n", averageDeadlock / timesDeadlockRun);
   	 						fprintf(stderr,"Total DeadLock Run: %d\n", timesDeadlockRun);
 					//		msgctl(messageQueueId, IPC_RMID, NULL); 
 					//		shmdt(shmPtr); //detaches a section of shared memory
@@ -264,6 +269,7 @@ int main(int argc, char* argv[]) {
 	
 		//				printf("oss recieve %s\n", message.mtext);	
 
+						//if it is request recieve from message queue execute this command
 						if(strcmp(message.mtext, "Request") == 0 ){
 	
 							int results = generateRequest(fakePid);
@@ -277,6 +283,7 @@ int main(int argc, char* argv[]) {
 
 							int resultBlocked = ifBlockResources(fakePid,results);
 
+							//if available resources is less than the request put it in the block queue 
 							if(resultBlocked == 0){
 								
 
@@ -284,7 +291,8 @@ int main(int argc, char* argv[]) {
 								if(strcmp("on", verbose) == 0) {
 									fprintf(fp,"Master blocking P%d requesting R%d at time %d:%d\n",fakePid, results,shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds );
 								}
-
+								
+								//checking duplication on the block queue
 								int f, duplicate = 0;
 								for(f=0; f< 18; f++){
 									if(queueArray[f] == fakePid){
@@ -299,6 +307,8 @@ int main(int argc, char* argv[]) {
 									duplicate = 0;
 								}
 								blockPos++;					
+			
+							//else request and remove available then transfer it to allocated resources of the user process
 							} else {
 								generateInterval(randomIntervalLaunch());
 								addRequestToAllocated(fakePid, results);
@@ -318,6 +328,7 @@ int main(int argc, char* argv[]) {
 							}
 						}	
 
+						//if terminated then edit the terminated queue and put -1 means it is terminated
 						if(strcmp(message.mtext, "Terminated") == 0 ){
 							trackProcessTerminated++;
 							generateInterval(randomIntervalLaunch());
@@ -331,6 +342,7 @@ int main(int argc, char* argv[]) {
 							release(fakePid,0);
 						}
 
+						//release the resources if none show none if there is resources it will remove allocated added back to available resources
 						if(strcmp(message.mtext, "Release") == 0 ){
 		
 							generateInterval(randomIntervalLaunch());
@@ -369,6 +381,7 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
+//generate termination queue
 void nonTerminate(){
 	int i;
 	for(i = 0; i < 18; i++){
@@ -379,6 +392,7 @@ void nonTerminate(){
 }
 
 
+//display the table
 void displayTable(){
 	fprintf(fp,"----------------------------------------------------------------------------------------------------------------------------------------------------\n");
 	fprintf(fp,"|                                                               Max Resources                                                                      |\n");	
@@ -426,6 +440,8 @@ void displayTable(){
 
 
 }
+
+//help meny
 void helpMenu() {
 		printf("---------------------------------------------------------------| Help Menu |--------------------------------------------------------------------------\n");
 		printf("-h help menu\n"); 
@@ -475,6 +491,7 @@ void release(int fakePid, int dl){
 	
 	
 
+	//check if theres no rss in the allocated
 	if(returnResult == 20){
 		
 		if(strcmp("on", verbose) == 0) {
@@ -485,6 +502,8 @@ void release(int fakePid, int dl){
 		
 			fprintf(fp,"None\n");
 		}
+
+	//if there is rss in the allocated return it back to available
 	} else {
 		
 		if(strcmp("on", verbose) == 0) {
@@ -496,7 +515,8 @@ void release(int fakePid, int dl){
 		}
 
 		int i;
-		//add to available
+
+		//add to available all the resources that user process
 		for(i=0; i < 20; i++) {
 			
 			if(i == shareable[0] || i == shareable[1] || i == shareable[2] || i == shareable[3]){
@@ -510,6 +530,7 @@ void release(int fakePid, int dl){
 	}
 }
 
+//deadlock protection
 void checkDeadLockDetection() {
 
 	timesDeadlockRun++;
@@ -517,7 +538,9 @@ void checkDeadLockDetection() {
 	fprintf(fp,"Master running deadlock detection at time %d:%d\n",shmPtr->clockInfo.seconds, shmPtr->clockInfo.nanoSeconds);
 	int i = 0;
 	int manyBlock = 0;	
+	int average = 0;
 
+	//check how many in the queue
 	for(i =0; i < 20; i++){
 		if(queueArray[i] != -1){
 			manyBlock++;
@@ -533,12 +556,8 @@ void checkDeadLockDetection() {
 	}	
 	fprintf(fp,"deadlocked\n");
 	fprintf(fp,"	Attempting to resolve deadlock...\n");
-/*
-	for(i =0; i < manyBlock; i++){
-		printf( "%d\n", resultArray[i]);
-	}	
-
-*/		
+	
+//kill the process if available is not greather than request
 	for(i =0; i < manyBlock; i++){	
 		if(shmPtr->resources.available[resultArray[i]] <= shmPtr->resourceDescriptor[queueArray[i]].request[resultArray[i]] ){
 			fprintf(fp,"	Killing process P%d\n", queueArray[i]);
@@ -556,6 +575,7 @@ void checkDeadLockDetection() {
 			
 				fprintf(fp,"deadlocked\n");
 			}
+		//if availabe is greater than then it will request the resources
 		} else {
 			addRequestToAllocated(queueArray[i], resultArray[i]);
 			fprintf(fp,"	Master granting P%d request R%d at time %d:%d\n",queueArray[i], resultArray[i], shmPtr->clockInfo.seconds,shmPtr->clockInfo.nanoSeconds);
@@ -564,6 +584,10 @@ void checkDeadLockDetection() {
 			//printf("%d:%d\n",shmPtr->resources.available[resultArray[i]],shmPtr->resourceDescriptor[queueArray[i]].request[resultArray[i]]);
 		}
 	}	
+	
+	average = numTerminatedDeadLock / manyBlock;
+	averageDeadlock += average;
+	
 	fprintf(fp,"System is no longer in deadlock\n");
 	fprintf(fp,"\n");
 }
@@ -579,7 +603,7 @@ int ifBlockResources(int fakePid, int result) {
 	}
 }
 
-
+//adding request to allocated
 void addRequestToAllocated(int fakePid, int results) {
 	
 
@@ -593,7 +617,7 @@ void addRequestToAllocated(int fakePid, int results) {
 
 
 
-
+//allocation = 0
 void generateAllocation(){
 	int i = 0;
 	int j = 0;
@@ -606,6 +630,7 @@ void generateAllocation(){
 	}
 }
 
+//generate the block queue
 void initializeQueueArray(){
 	int i = 0;
 	for(i = 0; i <20; i++){
@@ -647,6 +672,7 @@ void generateMaxResource(){
 	}
 }
 
+//interval for user pocess release of terminate or request, deadlock
 void generateInterval(int addInterval){
 	shmPtr->clockInfo.nanoSeconds += addInterval;
 	
@@ -656,6 +682,7 @@ void generateInterval(int addInterval){
 	}
 }
 
+//generate between process launch
 void generateLaunch(int addInterval) {
 	launchTime.nanoSeconds += addInterval;
 	
@@ -666,27 +693,28 @@ void generateLaunch(int addInterval) {
 	
 		
 } 
-
+//user process launch
 int  randomIntervalLaunch() {
 	int times = 0; 
 	times = rand() % (25000000 + 1 - 1) + 1;
 	return times;
 }
 
-
+//launch interval
 int  randomInterval() {
 	int times = 0; 
 	times = rand() % (50000000 + 1 - 1) + 1;
 	return times;
 }
 
+//randomizer resources
 int randomResources() {
 	int resources = 0;
 	resources = rand() % (10 + 1 - 1) + 1;
 	return resources;
 }
 
-
+//randomize shareable position
 int randomizeShareablePosition() {
 	int shareable = 0;
 	shareable = rand() % (19 + 0 - 0) + 0;
@@ -715,6 +743,7 @@ void signalCall(int signum)
    fprintf(stderr,"Total Request Granted: %d\n", trackRequest);	
    fprintf(stderr,"Total Normal Process Terminated: %d\n", trackProcessTerminated );
    fprintf(stderr,"Total Killed Process from DeadLock: %d\n", numTerminatedDeadLock);
+   fprintf(stderr,"Average is %d deadlock\n", averageDeadlock / timesDeadlockRun);
    fprintf(stderr,"Total DeadLock Run: %d\n", timesDeadlockRun);
 	
     //clean up program before exit (via interrupt signal)

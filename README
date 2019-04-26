@@ -1,0 +1,27 @@
+Ted Anthony L Uy
+CS4760
+Project 5
+
+project exec user process then let the child check if it will terminate, request, release resources, then it will return message queue what the master will do. with interval launch 500ms, and when something from message queue execute it will run in 0 to 250s. If user process release, it will release the allocated to the available, terminate it release the allocated to available. If it is requesting it will check if the available is greater than the request if not then goes to block else it will request.
+
+for deadlock detection it will check the block queue and there loop that check if it can still get resources if not the kill process and release it if it can get it. it will request a resources. then after deadlock detection it will redo all remaining user process until all become terminated 
+
+
+
+SYNTAX
+-h  			help menu
+
+-v  input(on/off)   	On: It will print out all the information to the log.  \n"); 
+			Off: It will print only the deadlock detection and how it is resolve\n");
+-n			max processor
+
+make			builds and creates exectuable 'p1'
+make clean		cleans object files and executables
+
+
+it sleeps in 10 seconds timer. somehow i added 2 file for result. because sometimes it work sometimes its not. maybe because of the message queue or shared memory queue on ipcs. i believe if i clear it, it will work. I tried my best to try to look like the same as the instruction.
+
+to enable verbose use oss -v on / or oss -v off...
+verbose is default to on
+
+ 

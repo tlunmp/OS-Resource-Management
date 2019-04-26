@@ -14,18 +14,14 @@
 #include <time.h>
 
 #define SHMKEY 9784
-
-#define MAX_USER_PROCESSES 18
+#define MESSAGEKEY 3000
+#define MAXPROCESSES 18
+#define RESOURCESAMT 20
 
 typedef struct clock {
 	int seconds;
 	int nanoSeconds;
 } Clock;
-
-typedef struct {
-    unsigned int seconds;
-    unsigned int nanoseconds;
-} systemClock_t;
 
 struct mesgQ {
     long mType;
@@ -33,16 +29,24 @@ struct mesgQ {
 } messenger;
 
 typedef struct {
-       int processWorking[18];
-       int available[20];
-       int max[18][20];
-       int allocated[18][20];
-       int request[18][20];
+	int max[RESOURCESAMT];
+	int available[RESOURCESAMT];
+} Resource;
+
+typedef struct {
+       int allocated[RESOURCESAMT];
+       int request[RESOURCESAMT];
+	int isTerminated;
 } ResourceDescriptor;
 
+typedef struct {
+	int fakePid;
+	int deadLockResources[20];
+} DeadLock;
+
 typedef struct shared_memory_object {
-    ResourceDescriptor resourceDescriptor[MAX_USER_PROCESSES + 1];
+    ResourceDescriptor resourceDescriptor[MAXPROCESSES + 1];
+    DeadLock deadLock[MAXPROCESSES + 1];
+    Resource resources;
     Clock clockInfo;
 } SharedMemory; 
-
-
