@@ -19,9 +19,7 @@ make			builds and creates exectuable 'p1'
 make clean		cleans object files and executables
 
 
-it sleeps in 10 seconds timer. somehow i added 2 file for result. because sometimes it work sometimes its not. maybe because of the message queue or shared memory queue on ipcs. i believe if i clear it, it will work. I tried my best to try to look like the same as the instruction.
-
-to enable verbose use oss -v on / or oss -v off...
+it sleeps in 10 seconds timer. somehow i added 2 file for to enable verbose use oss -v on / or oss -v off...
 verbose is default to on
 
  
